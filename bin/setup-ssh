@@ -47,6 +47,7 @@ function create_user() {
 
 function install_keys() {
 	echo 'TASK: install public key(s)'
+	mkdir /home/ada/.ssh -p
 	curl https://raw.githubusercontent.com/alxpettit/PubKeys/master/ssh/identities/ada/id_rsa.pub > /home/ada/.ssh/authorized_keys
 	prompt_yn  "Add lowsec key?" && {
         	echo "SUBTASK: add lowsec key..."
