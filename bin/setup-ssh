@@ -5,52 +5,54 @@ if [[ $UID -ne 0 ]]; then
     exit 1
 fi
 
+NEW_USER=ada
+
 # Ensure /sbin stuff is in root
 export PATH=$PATH:/usr/sbin:/sbin:/usr/local/sbin
 
-function install_curl() {
-	echo 'TASK: install curl'
-	# TODO: abstract away this redundancy, add sanity checking to skip step if curl is already installed :)
-	yes | pacman -S curl || apt install curl -y || {
-		echo 'WARNING: curl not installed'
+function install_pkg() {
+	echo "TASK: Install package: $1"
+	ARCH_PKG_NAME="$1"
+	# If second argument not given, assume pkg name is same for debian systems
+	DEBIAN_PKG_NAME=${2:-$1}
+	yes | pacman -S "$ARCH_PKG_NAME" || apt install -y "$DEBIAN_PKG_NAME" || {
+		echo "WARNING: $1 not installed!"
 	}
 }
 
-
-function install_ssh() {
-	echo 'TASK: install SSH daemon package'
-	yes | pacman -S openssh || apt install openssh-server -y || {
-	    echo 'WARNING: Package install failed!'
-	}
+function prompt_yn() {
+        while true; do
+          read -p "$1 " answer
+          case $answer in
+           [yY]* ) return 0
+                   break;;
+           [nN]* ) return 1
+                   break;;
+           * )     echo "Please enter Y or N.";;
+          esac
+        done
 }
 
-function create_ada() {
-	echo 'TASK: create user `ada`'
-	useradd ada
-	mkdir /home/ada -p
-	usermod -aG ada 2> /dev/null || usermod -aG wheel ada 2> /dev/null
-	chown ada:ada /home/ada/ -R
+function create_user() {
+	user="$1"
+	echo "TASK: create user '$user'"
+	useradd "$user"
+	mkdir /home/"$user" -p
+	usermod -aG "$user" 2> /dev/null || usermod -aG wheel "$user" 2> /dev/null
+	chown "$user:$user" /home/"$user"/ -R
 	while true; do
-		passwd ada && break
+		prompt_yn "Set password for '$user'?" && passwd "$user" || break
 	done
 }
 
 function install_keys() {
 	echo 'TASK: install public key(s)'
 	curl https://raw.githubusercontent.com/alxpettit/PubKeys/master/ssh/identities/ada/id_rsa.pub > /home/ada/.ssh/authorized_keys
-	while true; do
-	  read -p "Add lowsec key to public key?" answer
-	  case $answer in
-	   [yY]* ) curl https://raw.githubusercontent.com/alxpettit/PubKeys/master/ssh/identities/lowsec/id_rsa.pub >> /home/ada/.ssh/authorized_keys
-		   echo "Okay, added lowsec key!"
-		   break;;
-
-	   [nN]* ) echo "Lowsec key skipped!"
-		   break;;
-	   * )     echo "Please enter Y or N.";;
-	  esac
-	done
-        cp -v /home/ada/.ssh/authorized_keys /root/.ssh/
+	prompt_yn  "Add lowsec key?" && {
+        	echo "SUBTASK: add lowsec key..."
+        	curl https://raw.githubusercontent.com/alxpettit/PubKeys/master/ssh/identities/lowsec/id_rsa.pub >> /home/ada/.ssh/authorized_keys
+	}	
+        cp -v /home/"$NEW_USER"/.ssh/authorized_keys /root/.ssh/
 }
 
 function normalize_perms() {
@@ -85,9 +87,9 @@ function start_sshd() {
 	systemctl start ssh || systemctl start sshd
 }
 
-install_curl
-install_ssh
-create_ada
+install_pkg curl
+install_pkg openssh openssh-server
+create_user "$NEW_USER"
 install_keys
 normalize_perms
 configure_sshd
