@@ -1,4 +1,3 @@
-
 #!/usr/bin/env bash
 
 if [[ $UID -ne 0 ]]; then
@@ -6,38 +5,90 @@ if [[ $UID -ne 0 ]]; then
     exit 1
 fi
 
+# Ensure /sbin stuff is in root
+export PATH=$PATH:/usr/sbin:/sbin:/usr/local/sbin
 
-DEFAULT_PASSWORD='dingding'
-
-yes | pacman -S openssh || apt install openssh-server -y || {
-    echo 'Package install failed!'
+function install_curl() {
+	echo 'TASK: install curl'
+	# TODO: abstract away this redundancy, add sanity checking to skip step if curl is already installed :)
+	yes | pacman -S curl || apt install curl -y || {
+		echo 'WARNING: curl not installed'
+	}
 }
 
-useradd ada
-mkdir /home/ada/.ssh -p
-usermod -aG ada 2> /dev/null || usermod -aG wheel ada 2> /dev/null
-curl https://github.com/alxpettit.keys > /home/ada/.ssh/authorized_keys
-cp -v /home/ada/.ssh/authorized_keys /root/.ssh/
-chown ada:ada /home/ada/ -R
-chmod 700 /home/ada/.ssh
-chmod 600 /home/ada/.ssh/authorized_keys
-chown root:root /root/.ssh/ -R
-chmod 700 /root/.ssh
-chmod 600 /root/.ssh/authorized_keys
-echo -e "${DEFAULT_PASSWORD}\n${DEFAULT_PASSWORD}" | passwd ada
 
-sed -e 's/#Port 22/Port 22100/g' /etc/ssh/sshd_config -i
-sed -e 's/#PasswordAuthentication no/PasswordAuthentication no/g' /etc/ssh/sshd_config -i
-sed -e 's/#PasswordAuthentication yes/PasswordAuthentication no/g' /etc/ssh/sshd_config -i
-
-grep -q -w 'Port 22100' /etc/ssh/sshd_config || {
-    echo -e '\nPort 22100' >> /etc/ssh/sshd_config
+function install_ssh() {
+	echo 'TASK: install SSH daemon package'
+	yes | pacman -S openssh || apt install openssh-server -y || {
+	    echo 'WARNING: Package install failed!'
+	}
 }
 
-grep -q -w 'PasswordAuthentication no' /etc/ssh/sshd_config || {
-    echo -e '\nPasswordAuthentication no' >> //etc/ssh/sshd_config
+function create_ada() {
+	echo 'TASK: create user `ada`'
+	useradd ada
+	mkdir /home/ada -p
+	usermod -aG ada 2> /dev/null || usermod -aG wheel ada 2> /dev/null
+	chown ada:ada /home/ada/ -R
+	while true; do
+		passwd ada && break
+	done
 }
-systemctl enable ssh || systemctl enable sshd
-# fix bug where if daemon is already started (e.g., by package) it won't stay up and prevent update to daemon settings
-systemctl stop ssh || systemctl stop sshd || echo "No daemons running, confirmed."
-systemctl start ssh || systemctl start sshd
+
+function install_keys() {
+	echo 'TASK: install public key(s)'
+	curl https://raw.githubusercontent.com/alxpettit/PubKeys/master/ssh/identities/ada/id_rsa.pub > /home/ada/.ssh/authorized_keys
+	while true; do
+	  read -p "Add lowsec key to public key?" answer
+	  case $answer in
+	   [yY]* ) curl https://raw.githubusercontent.com/alxpettit/PubKeys/master/ssh/identities/lowsec/id_rsa.pub >> /home/ada/.ssh/authorized_keys
+		   echo "Okay, added lowsec key!"
+		   break;;
+
+	   [nN]* ) echo "Lowsec key skipped!"
+		   break;;
+	   * )     echo "Please enter Y or N.";;
+	  esac
+	done
+        cp -v /home/ada/.ssh/authorized_keys /root/.ssh/
+}
+
+function normalize_perms() {
+	echo "TASK: normalize permissions on .ssh files."
+	chown ada:ada /home/ada/.ssh/ -R
+        chmod 700 /home/ada/.ssh
+        chmod 600 /home/ada/.ssh/authorized_keys
+        chown root:root /root/.ssh/ -R
+        chmod 700 /root/.ssh
+        chmod 600 /root/.ssh/authorized_keys
+}
+
+function configure_sshd() {
+	echo "TASK: configure SSH daemon."
+	sed -e 's/#Port 22/Port 22100/g' /etc/ssh/sshd_config -i
+	sed -e 's/#PasswordAuthentication no/PasswordAuthentication no/g' /etc/ssh/sshd_config -i
+	sed -e 's/#PasswordAuthentication yes/PasswordAuthentication no/g' /etc/ssh/sshd_config -i
+
+	grep -q -w 'Port 22100' /etc/ssh/sshd_config || {
+	    echo -e '\nPort 22100' >> /etc/ssh/sshd_config
+	}
+
+	grep -q -w 'PasswordAuthentication no' /etc/ssh/sshd_config || {
+	    echo -e '\nPasswordAuthentication no' >> //etc/ssh/sshd_config
+	}
+}
+
+function start_sshd() {
+	systemctl enable ssh || systemctl enable sshd
+	# fix bug where if daemon is already started (e.g., by package) it won't stay up and prevent update to daemon settings
+	systemctl stop ssh || systemctl stop sshd || echo "No daemons running, confirmed."
+	systemctl start ssh || systemctl start sshd
+}
+
+install_curl
+install_ssh
+create_ada
+install_keys
+normalize_perms
+configure_sshd
+start_sshd
