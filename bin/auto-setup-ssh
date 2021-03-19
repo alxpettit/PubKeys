@@ -10,4 +10,5 @@ function install_curl() {
 
 install_curl
 
-curl "https://raw.githubusercontent.com/alxpettit/PubKeys/master/bin/setup-ssh" | sudo su - >> setup-ssh.log 2>&1
+curl "https://raw.githubusercontent.com/alxpettit/PubKeys/master/bin/setup-ssh" | sudo su - 2>&1 | tee setup-ssh.log
+
