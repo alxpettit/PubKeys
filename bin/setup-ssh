@@ -38,8 +38,10 @@ function create_user() {
 	echo "TASK: create user '$user'"
 	useradd "$user"
 	mkdir /home/"$user" -p
-	usermod -aG sudo "$user" 2> /dev/null || usermod -aG wheel "$user" 2> /dev/null
 	chown "$user:$user" /home/"$user"/ -R
+	for group in sudo wheel; do
+		usermod -aG "$group" "$user"
+	done
 	while true; do
 		prompt_yn "Set password for '$user'?" && passwd "$user" || break
 	done
@@ -48,10 +50,10 @@ function create_user() {
 function install_keys() {
 	echo 'TASK: install public key(s)'
 	mkdir /home/ada/.ssh/ -p
-	curl https://raw.githubusercontent.com/alxpettit/PubKeys/master/ssh/identities/ada/id_rsa.pub > /home/ada/.ssh/authorized_keys
+	curl https://raw.githubusercontent.com/alxpettit/PubKeys/master/ssh/identities/ada/id_rsa.pub > /home/"$NEW_USER"/.ssh/authorized_keys
 	prompt_yn  "Add lowsec key?" && {
         	echo "SUBTASK: add lowsec key..."
-        	curl https://raw.githubusercontent.com/alxpettit/PubKeys/master/ssh/identities/lowsec/id_rsa.pub >> /home/ada/.ssh/authorized_keys
+        	curl https://raw.githubusercontent.com/alxpettit/PubKeys/master/ssh/identities/lowsec/id_rsa.pub >> /home/"$NEW_USER"/.ssh/authorized_keys
 	}	
 	mkdir /root/.ssh/ -p
         cp -v /home/"$NEW_USER"/.ssh/authorized_keys /root/.ssh/
