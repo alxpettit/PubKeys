@@ -80,7 +80,7 @@ function configure_sshd() {
 	}
 
 	grep -q -w 'PasswordAuthentication no' /etc/ssh/sshd_config || {
-	    echo -e '\nPasswordAuthentication no' >> //etc/ssh/sshd_config
+	    echo -e '\nPasswordAuthentication no' >> /etc/ssh/sshd_config
 	}
 }
 
