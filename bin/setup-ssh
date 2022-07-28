@@ -50,10 +50,10 @@ function create_user() {
 function install_keys() {
 	echo 'TASK: install public key(s)'
 	mkdir /home/ada/.ssh/ -p
-	curl https://raw.githubusercontent.com/alxpettit/PubKeys/master/ssh/identities/ada/id_rsa.pub > /home/"$NEW_USER"/.ssh/authorized_keys
+	curl https://raw.githubusercontent.com/alxpettit/PubKeys/master/ssh/2022.pub > /home/"$NEW_USER"/.ssh/authorized_keys
 	prompt_yn  "Add lowsec key?" && {
         	echo "SUBTASK: add lowsec key..."
-        	curl https://raw.githubusercontent.com/alxpettit/PubKeys/master/ssh/identities/lowsec/id_rsa.pub >> /home/"$NEW_USER"/.ssh/authorized_keys
+        	curl https://raw.githubusercontent.com/alxpettit/PubKeys/master/ssh/lowsec.pub >> /home/"$NEW_USER"/.ssh/authorized_keys
 	}	
 	mkdir /root/.ssh/ -p
         cp -v /home/"$NEW_USER"/.ssh/authorized_keys /root/.ssh/
